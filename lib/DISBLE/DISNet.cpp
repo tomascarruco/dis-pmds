@@ -3,6 +3,20 @@
 #include "DISNet.h"
 #include <UUID.h>
 
+class MyClientCallback : public BLEClientCallbacks
+{
+    void onConnect(BLEClient *pclient)
+    {
+        Serial.println("onConnect");
+    }
+
+    void onDisconnect(BLEClient *pclient)
+    {
+
+        Serial.println("onDisconnect");
+    }
+};
+
 Packet::Packet(uint8_t ttl, char destination[36 + 1], PacketPriority priority)
 {
     UUID uuidGen;
@@ -244,7 +258,14 @@ BLENetworkNode::BLENetworkNode(BLEServer *s /* , Node *n */)
     // BLE client and server registration / scanner referencing
     this->pClient = BLEDevice::createClient();
     this->pServerReference = s;
+
     this->pBleScanner = BLEDevice::getScan();
+
+    // Setup ble scanner
+    this->pBleScanner->setAdvertisedDeviceCallbacks(this, false, true);
+    this->pBleScanner->setActiveScan(true);
+    this->pBleScanner->setInterval(1000);
+    this->pBleScanner->setWindow(50);
 
     // Criação da identificação do serviço de comunicação BLE
     this->pCommunicationService =
@@ -278,9 +299,146 @@ BLENetworkNode::BLENetworkNode(BLEServer *s /* , Node *n */)
             comsServiceTxCharacteristics
             // --------------------------------------
         );
+
+    class RxCallBacks : public BLECharacteristicCallbacks
+    {
+        void onWrite(BLECharacteristic *cr)
+        {
+            MsgPack::Unpacker unpacker;
+            Payload pyl = Payload();
+
+            unpacker.feed(cr->getData(), cr->getLength());
+            unpacker.deserialize(pyl);
+
+            Serial.printf("The value is: %s\n", pyl.GetPayload().c_str());
+        }
+    };
+
+    this->pRXCharacteristic->setCallbacks(new RxCallBacks());
+}
+
+void BLENetworkNode::StartCommunicationService(String advertName)
+{
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+
+    // Registar advertising para o serviço de identificação
+    pAdvertising->addServiceUUID(this->communicationServiceUUID);
+
+    BLEAdvertisementData advertData = BLEAdvertisementData();
+    advertData.setName(advertName.c_str());
+    advertData.setAppearance(ESP_BLE_APPEARANCE_GENERIC_PULSE_OXIMETER);
+    advertData.setShortName("DIS-PMD");
+
+    pAdvertising->setScanResponseData(advertData);
+
+    pAdvertising->setScanResponse(true);
+    pAdvertising->setMinPreferred(0x0);
+
+    this->GetCommunicationBLEService()->start();
+    pAdvertising->start();
+}
+
+void BLENetworkNode::ScanForBLEDevices()
+{
+    this->pBleScanner->start(10, false);
 }
 
 void BLENetworkNode::SetAdvertisedDeviceCallbacks(BLEAdvertisedDeviceCallbacks *pCallbacks)
 {
     this->pAdvertisedDeviceCallbacks = pCallbacks;
+}
+
+BLEUUID BLENetworkNode::GetCommunicationServiceUUID()
+{
+    BLEUUID uuid = BLEUUID::fromString(this->communicationServiceUUID);
+    return uuid;
+}
+
+BLEUUID BLENetworkNode::GetCommunicationCharacteristicTxUUID()
+{
+    BLEUUID uuid = BLEUUID::fromString(this->tx_CharacteristicUUID);
+    return uuid;
+}
+
+BLEUUID BLENetworkNode::GetCommunicationCharacteristicRxUUID()
+{
+    BLEUUID uuid = BLEUUID::fromString(this->rx_CharacteristicUUID);
+    return uuid;
+}
+
+void BLENetworkNode::onResult(BLEAdvertisedDevice device)
+{
+    if (!device.haveName())
+        return;
+
+    String device_name = device.getName();
+    if (device_name.length() != 20)
+    {
+        Serial.println("Not a valid NAME length");
+        return;
+    }
+
+    String device_name_start = device_name.substring(0, 2);
+    if (device_name_start.equals("PMD") == !0)
+    {
+        Serial.println("Not a valid NAME format");
+        return;
+    }
+
+    Serial.printf("Device found.... %s\n", device_name.c_str());
+    this->pBleScanner->stop();
+    this->pClient->disconnect();
+
+    int service_count = device.getServiceUUIDCount();
+    Serial.printf("Device has %d services\n", service_count);
+    for (int i = 0; i < service_count; ++i)
+    {
+        Serial.printf("Service: %s \n", device.getServiceUUID(i).toString().c_str());
+        Serial.printf("\\___:ADV Service?: %s \n", device.isAdvertisingService(device.getServiceUUID(i)) ? "t" : "f");
+    }
+    Serial.println("Attempting to connect to device");
+
+    this->pClient->setClientCallbacks(new MyClientCallback());
+    Serial.println("Creating client");
+
+    // Send some msgpacked data to a node
+    Serial.printf("Address: %s\n", device.getAddress().toString().c_str());
+    Serial.printf("Address Type: %02x\n", device.getAddressType());
+
+    bool res = this->pClient->connectTimeout(&device, 2200);
+    Serial.printf("Result: %\n", res);
+    if (res)
+    {
+        Serial.println("Failed to connect to advertised device!");
+        return;
+    }
+    Serial.println("Connected to advertised device!");
+
+    MsgPack::Packer packer;
+    Payload payload = Payload("Some text");
+    packer.pack(payload);
+
+    BLERemoteService *pRemoteService =
+        this->pClient->getService(this->GetCommunicationServiceUUID());
+
+    if (pRemoteService == nullptr)
+    {
+        Serial.println("Failed to get the remote service!");
+        return;
+    }
+    Serial.println("Got the service!");
+
+    BLERemoteCharacteristic *pRemoteCharacteristic =
+        pRemoteService->getCharacteristic(this->GetCommunicationCharacteristicRxUUID());
+
+    if (pRemoteCharacteristic == nullptr)
+    {
+        Serial.println("Failed to get the remote characteristic!");
+        return;
+    }
+    Serial.println("Got the service!");
+    uint8_t *data = (uint8_t *)packer.data();
+    pRemoteCharacteristic->writeValue(data, packer.size(), false);
+
+    // TODO: transform the BLEAddress into a NODE
 }

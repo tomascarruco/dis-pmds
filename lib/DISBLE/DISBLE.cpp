@@ -163,7 +163,7 @@ void MainBLEServer::StartAdvertising(String advertName)
     pAdvertising->setScanResponse(true);
     pAdvertising->setMinPreferred(0x0);
 
-    BLEDevice::startAdvertising();
+    pAdvertising->start();
 }
 
 int MainBLEServer::SetCharacteristicValue(MainBLECharacteristics characteristic, String value, bool notify)

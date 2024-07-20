@@ -80,6 +80,7 @@ public:
     // ---- Behavior START ----
     void CycleTTL();
     int AddNodeToPath(NodeConnectionInfo_t *node);
+    // TODO: Add MsgPacking to the Packet field, being called from this class
     // ---- Behavior END ----
 };
 
@@ -239,12 +240,22 @@ public:
     // ---- Behavior END ----
 };
 
-class BLENetworkNode
+class BLENetworkNode : public BLEAdvertisedDeviceCallbacks
 {
 private:
+    // Inheritance
+    void onResult(BLEAdvertisedDevice);
+    // ---
+
     BLEClient *pClient = nullptr;
     BLEServer *pServerReference = nullptr;
+
     BLEScan *pBleScanner = nullptr;
+    Node *BleNodes[4] = {
+        nullptr, nullptr,
+        nullptr, nullptr
+        // ---
+    };
 
     // BLEAdvertise callbacks
     BLEAdvertisedDeviceCallbacks *pAdvertisedDeviceCallbacks;
@@ -258,10 +269,10 @@ private:
         BLECharacteristic::PROPERTY_WRITE |
         BLECharacteristic::PROPERTY_NOTIFY;
 
-    char communicationServiceUUID[36 + 1] = "2b9eba18-e6ed-4757-9c7a-fd1dbe693a38";
+    const char communicationServiceUUID[36 + 1] = "3b98eff8-b21d-4958-88bc-aca8688f1bb4";
 
-    char tx_CharacteristicUUID[36 + 1] = "2b9eba18-e6ed-4757-9c7a-fd1dbe693a40";
-    char rx_CharacteristicUUID[36 + 1] = "2b9eba18-e6ed-4757-9c7a-fd1dbe693a41";
+    char tx_CharacteristicUUID[36 + 1] = "cc6b17c4-815b-4e01-86ab-cbbf9c467425";
+    char rx_CharacteristicUUID[36 + 1] = "45ca38e6-db5b-44b9-a0ab-85c2b754d60c";
 
     BLECharacteristic *pTXCharacteristic = nullptr;
     BLECharacteristic *pRXCharacteristic = nullptr;
@@ -270,7 +281,7 @@ private:
     // Node *node = nullptr;
 
 public:
-    typedef enum ServiceDenomination
+    enum ServiceDenomination
     {
         Tx,
         Rx
@@ -280,6 +291,12 @@ public:
     Constructors
     ------------------------ */
     BLENetworkNode(BLEServer * /* , Node * */);
+
+    /* ----------------------
+    Behaviour
+    ------------------------ */
+    void StartCommunicationService(String advertName);
+    void ScanForBLEDevices();
 
     /* ----------------------
     Setters
@@ -294,7 +311,7 @@ public:
         return this->pCommunicationService;
     }
 
-    uint32_t GetComServiceCallbacks(ServiceDenomination service)
+    /* uint32_t GetComServiceCharacteristics(ServiceDenomination service)
     {
         switch (service)
         {
@@ -305,5 +322,9 @@ public:
         default:
             return 0;
         }
-    }
+    } */
+
+    BLEUUID GetCommunicationServiceUUID();
+    BLEUUID GetCommunicationCharacteristicTxUUID();
+    BLEUUID GetCommunicationCharacteristicRxUUID();
 };

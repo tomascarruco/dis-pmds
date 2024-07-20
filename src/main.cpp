@@ -20,44 +20,6 @@
 #include <AES.h>
 #include <Crypto.h>
 
-class BLENodeDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
-{
-  // Inheritance
-  void onResult(BLEAdvertisedDevice);
-};
-
-void BLENodeDeviceCallbacks::onResult(BLEAdvertisedDevice device)
-{
-  if (!device.haveName())
-    return;
-
-  std::string device_name = device.getName();
-  if (device_name.length() != 20)
-  {
-    Serial.println("Not a valid NAME length");
-    return;
-  }
-
-  std::string device_name_start = device_name.substr(0, 3);
-  if (device_name_start.compare("PMD") == !0)
-  {
-    Serial.printf("Not a valid NAME format");
-    return;
-  }
-
-  Serial.printf("Device found.... %s\n", device_name.c_str());
-
-  int service_count = device.getServiceUUIDCount();
-  Serial.printf("Device has %d services\n", service_count);
-  for (int i = 0; i < service_count; ++i)
-  {
-    Serial.printf("Service: %s \n", device.getServiceUUID(i).toString().c_str());
-    Serial.printf("\\___:ADV Service?: %s \n", device.isAdvertisingService(device.getServiceUUID(i)) ? "t" : "f");
-  }
-
-  // TODO: transform the BLEAddress into a NODE
-}
-
 // ---------------------------------------------------
 
 DeviceRoutingMode permissions = DeviceRoutingModes::receives + DeviceRoutingModes::transmits;
@@ -66,7 +28,8 @@ elapsedMillis timerOne;
 
 AES128_ESP aes128;
 MainBLEServer ble_server;
-BLEScan *ble_scanner;
+BLENetworkNode *thisBLENetworkNode;
+// BLEScan *ble_scanner;
 
 const byte key[16] = {
     0x2b, 0x7e, 0x15, 0x16,
@@ -105,58 +68,52 @@ void setup()
   bleId = bleId.substring(0, 20);
 
   BLEDevice::init(bleId.c_str());
-  ble_server = MainBLEServer(new ServerCallbacks());
-
-  // BLE device scanning
-  ble_scanner = BLEDevice::getScan();
-  ble_scanner->setAdvertisedDeviceCallbacks(new BLENodeDeviceCallbacks());
-  ble_scanner->setActiveScan(true);
-  ble_scanner->setInterval(1000);
-  ble_scanner->setWindow(50);
+  // ble_server = MainBLEServer(new ServerCallbacks());
 
   // Adicionar os callbacks à caracteristica de id do dispositivo -----------------
-  BLECharacteristicCallbacks *pDeviceIdentifierCharacteristicCallbacks =
-      new DidCallbacks(dispIdentifier, &ble_server);
+  /* BLECharacteristicCallbacks *pDeviceIdentifierCharacteristicCallbacks =
+      new DidCallbacks(dispIdentifier, &ble_server); */
 
   /* int err = ble_server.SetCharacteristicCallbacks(
       MainBLECharacteristics::PatientID,
       patientIdCharacteristicCallbacks
   ); */
 
-  MainBLECharacteristics caracteristicas[4] = {
+  /* MainBLECharacteristics caracteristicas[4] = {
       MainBLECharacteristics::PatientID,
       MainBLECharacteristics::DeviceID,
       MainBLECharacteristics::DeviceState,
       MainBLECharacteristics::RoutingMode
       // ---------------------------------
-  };
+  }; */
 
-  int err = ble_server.SetCharacteristicsCallbacks(
-      pDeviceIdentifierCharacteristicCallbacks,
-      caracteristicas,
-      4
-      // ----
-  );
-  if (err != 0)
+  /*   int err = ble_server.SetCharacteristicsCallbacks(
+        pDeviceIdentifierCharacteristicCallbacks,
+        caracteristicas,
+        4
+        // ----
+    ); */
+  /* if (err != 0)
   {
     Serial.printf("FATAL: FAILED TO ADD CALLBACKS TO DEVICE ID CHARACTERISTICS\n");
     exit(-1);
-  }
-  delay(100);
+  } */
+  // delay(100);
   // ------------------------------------------------------------------------------
-
-  ble_server.StartIdService();
-  delay(100);
-  ble_server.StartAdvertising(bleId);
 
   // dispIdentifier->InitWifi();
   // BLENetworkNode usage
   // Node(BLEAdvertisedDevice *deviceId);
-  BLEServer *server = ble_server.GetBleServerRef();
-  BLENetworkNode *networkNode = new BLENetworkNode(server);
+  /*   BLEServer *server = ble_server.GetBleServerRef();
+    thisBLENetworkNode = new BLENetworkNode(server); */
+
+  /* thisBLENetworkNode->StartCommunicationService(bleId);
+  delay(100);
+  ble_server.StartIdService(); */
+  // ble_server.StartAdvertising(bleId);
 }
 
 void loop()
 {
-  BLEScanResults results = ble_scanner->start(5, false);
+  thisBLENetworkNode->ScanForBLEDevices();
 }
