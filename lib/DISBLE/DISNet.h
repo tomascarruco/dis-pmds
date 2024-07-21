@@ -282,6 +282,20 @@ private:
     char rx_CharacteristicUUID[36 + 1] = "45ca38e6-db5b-44b9-a0ab-85c2b754d60c";
 
     BLECharacteristic *pTXCharacteristic = nullptr;
+
+    class RxCallBacks : public BLECharacteristicCallbacks
+    {
+        void onWrite(BLECharacteristic *cr)
+        {
+            MsgPack::Unpacker unpacker;
+            Payload pyl = Payload();
+
+            unpacker.feed(cr->getData(), cr->getLength());
+            unpacker.deserialize(pyl);
+
+            Serial.printf("The value is: %s\n", pyl.GetPayload().c_str());
+        }
+    };
     BLECharacteristic *pRXCharacteristic = nullptr;
 
     BLEService *pCommunicationService = nullptr;

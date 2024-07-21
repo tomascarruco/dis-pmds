@@ -253,8 +253,6 @@ NetworkNode::NetworkNode()
 
 BLENetworkNode::BLENetworkNode(BLEServer *s /* , Node *n */)
 {
-    // this->node = n;
-
     // BLE client and server registration / scanner referencing
     this->pClient = BLEDevice::createClient();
     this->pServerReference = s;
@@ -275,7 +273,7 @@ BLENetworkNode::BLENetworkNode(BLEServer *s /* , Node *n */)
 
     // Criação da caracteristica do serviço de comunicação.
     uint32_t comsServiceRxCharacteristics =
-        BLECharacteristic::PROPERTY_READ |
+        BLECharacteristic::PROPERTY_WRITE |
         BLECharacteristic::PROPERTY_NOTIFY;
 
     // Criação da caracteristica de receção de informação.
@@ -288,32 +286,18 @@ BLENetworkNode::BLENetworkNode(BLEServer *s /* , Node *n */)
 
     // Criação da caracteristica do serviço de comunicação.
     uint32_t comsServiceTxCharacteristics =
-        BLECharacteristic::PROPERTY_WRITE |
+        BLECharacteristic::PROPERTY_READ |
         BLECharacteristic::PROPERTY_NOTIFY;
 
     // Criação da caracteristica de receção de informação.
-    this->pRXCharacteristic =
+    this->pTXCharacteristic =
         this->pCommunicationService->createCharacteristic(
             this->tx_CharacteristicUUID,
             comsServiceTxCharacteristics
             // --------------------------------------
         );
 
-    class RxCallBacks : public BLECharacteristicCallbacks
-    {
-        void onWrite(BLECharacteristic *cr)
-        {
-            MsgPack::Unpacker unpacker;
-            Payload pyl = Payload();
-
-            unpacker.feed(cr->getData(), cr->getLength());
-            unpacker.deserialize(pyl);
-
-            Serial.printf("The value is: %s\n", pyl.GetPayload().c_str());
-        }
-    };
-
-    this->pRXCharacteristic->setCallbacks(new RxCallBacks());
+    this->pRXCharacteristic->setCallbacks(new BLENetworkNode::RxCallBacks());
 }
 
 void BLENetworkNode::StartCommunicationService()
@@ -385,12 +369,20 @@ void BLENetworkNode::onResult(BLEAdvertisedDevice device)
     for (int i = 0; i < service_count; ++i)
     {
         Serial.printf("Service: %s \n", device.getServiceUUID(i).toString().c_str());
-        Serial.printf("\\___:ADV Service?: %s \n", device.isAdvertisingService(device.getServiceUUID(i)) ? "t" : "f");
+        Serial.printf("* ---- ADV Service?: %s \n", device.isAdvertisingService(device.getServiceUUID(i)) ? "t" : "f");
     }
 
-    this->device = new BLEAdvertisedDevice(device);
-    this->doConnect = true;
-    this->doScan = false;
+    if (device.haveServiceUUID() && device.isAdvertisingService(this->GetCommunicationServiceUUID()))
+    {
+        this->device = new BLEAdvertisedDevice(device);
+        this->doConnect = true;
+        this->doScan = false;
+        return;
+    }
+
+    this->doScan = true;
+    this->doScan = true;
+    this->connected = false;
 }
 
 void BLENetworkNode::connectToDevice()
@@ -407,29 +399,27 @@ void BLENetworkNode::connectToDevice()
         Serial.printf("Service: %s \n", device->getServiceUUID(i).toString().c_str());
         Serial.printf("\\___:ADV Service?: %s \n", device->isAdvertisingService(device->getServiceUUID(i)) ? "t" : "f");
     }
-    Serial.println("Attempting to connect to device");
 
-    Serial.println("Creating client");
+    this->pClient->setClientCallbacks(new MyClientCallback());
 
-    BLEClient *pClient = BLEDevice::createClient();
-    Serial.println(" - Created client");
-
-    pClient->setClientCallbacks(new MyClientCallback());
-
-    // Connect to the remove BLE Server.
-    bool res = pClient->connect(device); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
+    // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
+    bool res = this->pClient->connect(device);
     Serial.println(" - Connected to server");
-    pClient->setMTU(517); // set client to request maximum MTU from server (default is 23 otherwise)
 
-    this->connected = true;
-    this->doConnect = false;
-
-    /* if (res)
+    if (!res)
     {
         Serial.println("Failed to connect to advertised device!");
+        this->connected = false;
+        this->doConnect = false;
+        this->doScan = true;
+
         return;
     }
     Serial.println("Connected to advertised device!");
+
+    this->connected = true;
+    this->doConnect = true;
+    this->doScan = false;
 
     MsgPack::Packer packer;
     Payload payload = Payload("Some text");
@@ -453,9 +443,22 @@ void BLENetworkNode::connectToDevice()
         Serial.println("Failed to get the remote characteristic!");
         return;
     }
+
+    if (!pRemoteCharacteristic->canWrite())
+    {
+        Serial.println("Characteristic does not allow write operations");
+        return;
+    }
+
     Serial.println("Got the service!");
     uint8_t *data = (uint8_t *)packer.data();
-    pRemoteCharacteristic->writeValue(data, packer.size(), false); */
+    pRemoteCharacteristic->writeValue(data, packer.size(), false);
+
+    Serial.println("Wrote to characteristic");
+
+    this->connected = false;
+    this->doConnect = false;
+    this->doScan = false;
 
     // TODO: transform the BLEAddress into a NODE
 }
