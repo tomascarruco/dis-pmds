@@ -25,17 +25,17 @@ enum MainBLECharacteristics
 class MainBLEServer
 {
 private:
+    BLEAdvertising *pAdvertising = nullptr;
     BLEServer *pServer = nullptr;
     BLEClient *pClient = nullptr;
-    UUID uuidGen;
 
     // BLE device identification service
     char mainServiceUUID[36 + 1] = "3b98eff8-b21d-4958-88bc-aca8688f1bb9";
 
-    char deviceIdCharacteristicUUID[36 + 1];
-    char patientIDCharacteristicUUID[36 + 1];
-    char deviceStateCharacteristicUUID[36 + 1];
-    char deviceRoutingCharacteristicUUID[36 + 1];
+    char deviceIdCharacteristicUUID[36 + 1] = "a3e5f815-f164-47a8-9798-a6f1522ee643";
+    char patientIDCharacteristicUUID[36 + 1] = "05b1912c-5b45-449b-b094-111251e47be5";
+    char deviceStateCharacteristicUUID[36 + 1] = "72844701-8953-4f0e-989f-bc79b340523f";
+    char deviceRoutingCharacteristicUUID[36 + 1] = "435090a0-391e-435b-8d8e-92336936adc9";
 
     BLECharacteristic *pDeviceIdCharacteristic = nullptr;
     BLECharacteristic *pPatientIDCharacteristic = nullptr;

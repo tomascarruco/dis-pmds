@@ -10,6 +10,20 @@ MainBLEServer::MainBLEServer(
     // ---------------------------------------------
 )
 {
+    // Criacao do advertisement para o dispositivo
+    BLEAdvertisementData advertData = BLEAdvertisementData();
+
+    this->pAdvertising = BLEDevice::getAdvertising();
+
+    advertData.setName(advertName.c_str());
+    advertData.setAppearance(ESP_BLE_APPEARANCE_GENERIC_PULSE_OXIMETER);
+    advertData.setShortName("DIS-PMD");
+
+    pAdvertising->setScanResponseData(advertData);
+
+    pAdvertising->setScanResponse(true);
+    pAdvertising->setMinPreferred(0x0);
+
     // Criação do cliente BLE
     this->pClient = BLEDevice::createClient();
     // this->pClient->setCallbacks(pBleServerCallbacks);
@@ -17,25 +31,6 @@ MainBLEServer::MainBLEServer(
     // Criação do servidor BLE
     this->pServer = BLEDevice::createServer();
     this->pServer->setCallbacks(pBleServerCallbacks);
-
-    this->uuidGen.setRandomMode();
-    this->uuidGen.setVariant4Mode();
-
-    // Criação dos UUID do Serviço de identificação e as sua caracteristica
-    // this->uuidGen.generate();
-    // strncpy(this->MainServiceUUID, this->uuidGen.toCharArray(), 37);
-
-    this->uuidGen.generate();
-    strncpy(this->deviceIdCharacteristicUUID, this->uuidGen.toCharArray(), 37);
-
-    this->uuidGen.generate();
-    strncpy(this->patientIDCharacteristicUUID, this->uuidGen.toCharArray(), 37);
-
-    this->uuidGen.generate();
-    strncpy(this->deviceStateCharacteristicUUID, this->uuidGen.toCharArray(), 37);
-
-    this->uuidGen.generate();
-    strncpy(this->deviceRoutingCharacteristicUUID, this->uuidGen.toCharArray(), 37);
     // -----------------------------------------------
 
     // Criação da identificação do serviço BLE
@@ -138,7 +133,7 @@ void MainBLEServer::StartIdService()
 
 void MainBLEServer::StartIdentificationService()
 {
-    this->pIdService->start();
+    this->StartIdService();
 }
 
 void MainBLEServer::StopIdentificationService()
@@ -148,21 +143,8 @@ void MainBLEServer::StopIdentificationService()
 
 void MainBLEServer::StartAdvertising(String advertName)
 {
-    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-
     // Registar advertising para o serviço de identificação
-    pAdvertising->addServiceUUID(this->mainServiceUUID);
-
-    BLEAdvertisementData advertData = BLEAdvertisementData();
-    advertData.setName(advertName.c_str());
-    advertData.setAppearance(ESP_BLE_APPEARANCE_GENERIC_PULSE_OXIMETER);
-    advertData.setShortName("DIS-PMD");
-
-    pAdvertising->setScanResponseData(advertData);
-
-    pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x0);
-
+    this->pAdvertising->addServiceUUID(this->mainServiceUUID);
     BLEDevice::startAdvertising();
 }
 
