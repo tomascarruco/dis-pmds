@@ -10,6 +10,7 @@
 
 /* ---- Private Libs ---- */
 #include <MsgPack.h>
+#include <DISBLE.h>
 #include <DIS.h>
 /* ---- Private Libs ---- */
 
@@ -243,6 +244,12 @@ public:
 class BLENetworkNode : public BLEAdvertisedDeviceCallbacks
 {
 private:
+    BLEAdvertisedDevice *device = nullptr;
+
+    bool doScan = true;
+    bool doConnect = false;
+    bool connected = false;
+
     // Inheritance
     void onResult(BLEAdvertisedDevice);
     // ---
@@ -295,7 +302,7 @@ public:
     /* ----------------------
     Behaviour
     ------------------------ */
-    void StartCommunicationService(String advertName);
+    void StartCommunicationService();
     void ScanForBLEDevices();
 
     /* ----------------------
@@ -327,4 +334,6 @@ public:
     BLEUUID GetCommunicationServiceUUID();
     BLEUUID GetCommunicationCharacteristicTxUUID();
     BLEUUID GetCommunicationCharacteristicRxUUID();
+
+    void connectToDevice();
 };

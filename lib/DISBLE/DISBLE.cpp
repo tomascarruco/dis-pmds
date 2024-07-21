@@ -163,7 +163,7 @@ void MainBLEServer::StartAdvertising(String advertName)
     pAdvertising->setScanResponse(true);
     pAdvertising->setMinPreferred(0x0);
 
-    pAdvertising->start();
+    BLEDevice::startAdvertising();
 }
 
 int MainBLEServer::SetCharacteristicValue(MainBLECharacteristics characteristic, String value, bool notify)
@@ -234,12 +234,9 @@ BLEUUID MainBLEServer::GetCharacteristicUUID(MainBLECharacteristics characterist
     return uuid;
 }
 
-void MainBLEServer::RegisterExtensionService(BLEService *)
+void MainBLEServer::RegisterExtensionService(BLEService *service)
 {
-    this->pServer->createService(
-        this->mainServiceUUID
-        // -----------------------------------------
-    );
+    this->pServer->createService(service->getUUID());
 }
 
 /*

@@ -8,6 +8,8 @@
 #include <BLE2902.h>
 /* ---- BLE Libraries ---- */
 
+#include <map>
+
 #include <UUID.h>
 #include <DIS.h>
 

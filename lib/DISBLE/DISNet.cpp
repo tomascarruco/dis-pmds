@@ -258,7 +258,6 @@ BLENetworkNode::BLENetworkNode(BLEServer *s /* , Node *n */)
     // BLE client and server registration / scanner referencing
     this->pClient = BLEDevice::createClient();
     this->pServerReference = s;
-
     this->pBleScanner = BLEDevice::getScan();
 
     // Setup ble scanner
@@ -317,30 +316,20 @@ BLENetworkNode::BLENetworkNode(BLEServer *s /* , Node *n */)
     this->pRXCharacteristic->setCallbacks(new RxCallBacks());
 }
 
-void BLENetworkNode::StartCommunicationService(String advertName)
+void BLENetworkNode::StartCommunicationService()
 {
     BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
 
     // Registar advertising para o serviço de identificação
     pAdvertising->addServiceUUID(this->communicationServiceUUID);
 
-    BLEAdvertisementData advertData = BLEAdvertisementData();
-    advertData.setName(advertName.c_str());
-    advertData.setAppearance(ESP_BLE_APPEARANCE_GENERIC_PULSE_OXIMETER);
-    advertData.setShortName("DIS-PMD");
-
-    pAdvertising->setScanResponseData(advertData);
-
-    pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x0);
-
-    this->GetCommunicationBLEService()->start();
-    pAdvertising->start();
+    this->pCommunicationService->start();
 }
 
 void BLENetworkNode::ScanForBLEDevices()
 {
-    this->pBleScanner->start(10, false);
+    if (this->doScan)
+        this->pBleScanner->start(10, false);
 }
 
 void BLENetworkNode::SetAdvertisedDeviceCallbacks(BLEAdvertisedDeviceCallbacks *pCallbacks)
@@ -368,6 +357,9 @@ BLEUUID BLENetworkNode::GetCommunicationCharacteristicRxUUID()
 
 void BLENetworkNode::onResult(BLEAdvertisedDevice device)
 {
+    if (this->connected)
+        return;
+
     if (!device.haveName())
         return;
 
@@ -386,8 +378,7 @@ void BLENetworkNode::onResult(BLEAdvertisedDevice device)
     }
 
     Serial.printf("Device found.... %s\n", device_name.c_str());
-    this->pBleScanner->stop();
-    this->pClient->disconnect();
+    // this->pBleScanner->stop();
 
     int service_count = device.getServiceUUIDCount();
     Serial.printf("Device has %d services\n", service_count);
@@ -396,18 +387,44 @@ void BLENetworkNode::onResult(BLEAdvertisedDevice device)
         Serial.printf("Service: %s \n", device.getServiceUUID(i).toString().c_str());
         Serial.printf("\\___:ADV Service?: %s \n", device.isAdvertisingService(device.getServiceUUID(i)) ? "t" : "f");
     }
-    Serial.println("Attempting to connect to device");
+
+    this->device = new BLEAdvertisedDevice(device);
+    this->doConnect = true;
+    this->doScan = false;
+}
+
+void BLENetworkNode::connectToDevice()
+{
+    if (!this->doConnect)
+        return;
 
     this->pClient->setClientCallbacks(new MyClientCallback());
+
+    int service_count = device->getServiceUUIDCount();
+    Serial.printf("Device has %d services\n", service_count);
+    for (int i = 0; i < service_count; ++i)
+    {
+        Serial.printf("Service: %s \n", device->getServiceUUID(i).toString().c_str());
+        Serial.printf("\\___:ADV Service?: %s \n", device->isAdvertisingService(device->getServiceUUID(i)) ? "t" : "f");
+    }
+    Serial.println("Attempting to connect to device");
+
     Serial.println("Creating client");
 
-    // Send some msgpacked data to a node
-    Serial.printf("Address: %s\n", device.getAddress().toString().c_str());
-    Serial.printf("Address Type: %02x\n", device.getAddressType());
+    BLEClient *pClient = BLEDevice::createClient();
+    Serial.println(" - Created client");
 
-    bool res = this->pClient->connectTimeout(&device, 2200);
-    Serial.printf("Result: %\n", res);
-    if (res)
+    pClient->setClientCallbacks(new MyClientCallback());
+
+    // Connect to the remove BLE Server.
+    bool res = pClient->connect(device); // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
+    Serial.println(" - Connected to server");
+    pClient->setMTU(517); // set client to request maximum MTU from server (default is 23 otherwise)
+
+    this->connected = true;
+    this->doConnect = false;
+
+    /* if (res)
     {
         Serial.println("Failed to connect to advertised device!");
         return;
@@ -438,7 +455,7 @@ void BLENetworkNode::onResult(BLEAdvertisedDevice device)
     }
     Serial.println("Got the service!");
     uint8_t *data = (uint8_t *)packer.data();
-    pRemoteCharacteristic->writeValue(data, packer.size(), false);
+    pRemoteCharacteristic->writeValue(data, packer.size(), false); */
 
     // TODO: transform the BLEAddress into a NODE
 }
