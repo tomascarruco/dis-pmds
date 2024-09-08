@@ -99,17 +99,26 @@ void setup()
   thisBLENetworkNode = new BLENetworkNode(server);
 
   thisBLENetworkNode->StartCommunicationService();
+  BLEUUID serviceUUID = thisBLENetworkNode->GetCommunicationServiceUUID();
+
   ble_server->StartIdService();
-  ble_server->StartAdvertising(bleId);
+  ble_server->StartAdvertising(bleId, 1, {&serviceUUID});
+
+  Serial.println("Finished Setup");
 }
 
 void loop()
 {
-  // handleBLeRoutines();
+  thisBLENetworkNode->ScanForBLEDevices();
 }
 
 void handleBLeRoutines()
 {
   thisBLENetworkNode->ScanForBLEDevices();
-  thisBLENetworkNode->connectToDevice();
+  bool connected = thisBLENetworkNode->connectToDevice();
+  if (!connected)
+  {
+    return;
+  }
+  thisBLENetworkNode->echoMessage();
 }

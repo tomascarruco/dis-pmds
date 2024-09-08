@@ -81,7 +81,7 @@ public:
     void StartIdentificationService();
     void StopIdentificationService();
 
-    void StartAdvertising(String advertName);
+    void StartAdvertising(String advertName, u8_t otherServicesCount, BLEUUID serviceUUIDs[]);
 
     int SetCharacteristicValue(MainBLECharacteristics characteristic, String value, bool notify);
 

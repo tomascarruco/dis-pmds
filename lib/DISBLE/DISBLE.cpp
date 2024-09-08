@@ -10,20 +10,6 @@ MainBLEServer::MainBLEServer(
     // ---------------------------------------------
 )
 {
-    // Criacao do advertisement para o dispositivo
-    BLEAdvertisementData advertData = BLEAdvertisementData();
-
-    this->pAdvertising = BLEDevice::getAdvertising();
-
-    advertData.setName(advertName.c_str());
-    advertData.setAppearance(ESP_BLE_APPEARANCE_GENERIC_PULSE_OXIMETER);
-    advertData.setShortName("DIS-PMD");
-
-    pAdvertising->setScanResponseData(advertData);
-
-    pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x0);
-
     // Criação do cliente BLE
     this->pClient = BLEDevice::createClient();
     // this->pClient->setCallbacks(pBleServerCallbacks);
@@ -141,10 +127,36 @@ void MainBLEServer::StopIdentificationService()
     this->pIdService->stop();
 }
 
-void MainBLEServer::StartAdvertising(String advertName)
+void MainBLEServer::StartAdvertising(String advertName, u8_t otherServicesCount, BLEUUID serviceUUIDs[])
 {
+    if (otherServicesCount < 0)
+    {
+        Serial.println("Passed negative value into service count on StartAdvertising");
+        return;
+    }
+
     // Registar advertising para o serviço de identificação
-    this->pAdvertising->addServiceUUID(this->mainServiceUUID);
+    // Criacao do advertisement para o dispositivo
+    BLEAdvertisementData advertData = BLEAdvertisementData();
+
+    this->pAdvertising = BLEDevice::getAdvertising();
+
+    advertData.setName(advertName.c_str());
+    advertData.setAppearance(ESP_BLE_APPEARANCE_GENERIC_PULSE_OXIMETER);
+    advertData.setShortName("DIS-PMD");
+
+    pAdvertising->setScanResponseData(advertData);
+
+    pAdvertising->setScanResponse(true);
+    pAdvertising->setMinPreferred(0x0);
+
+    pAdvertising->addServiceUUID(this->mainServiceUUID);
+
+    for (int i = 0; i < otherServicesCount; i++)
+    {
+        pAdvertising->addServiceUUID(serviceUUIDs[i]);
+    }
+
     BLEDevice::startAdvertising();
 }
 

@@ -232,7 +232,7 @@ public:
     ScalablePacketQueue();
 
     // Destructor
-    // TODO implement this method
+    // TODO implement this method?
     // ~ScalablePacketQueue();
 
     // ---- Behavior START ----
@@ -244,6 +244,12 @@ public:
 class BLENetworkNode : public BLEAdvertisedDeviceCallbacks
 {
 private:
+    // Packet queue
+    ScalablePacketQueue packetQueue = ScalablePacketQueue();
+
+    // We keep the found PMD devices in the server reference "peer devices" spot
+    // and use this counter as an peer device ID source.
+    uint8_t peerDeviceCount = 0;
     BLEAdvertisedDevice *device = nullptr;
 
     bool doScan = true;
@@ -288,18 +294,21 @@ private:
         void onWrite(BLECharacteristic *cr)
         {
             MsgPack::Unpacker unpacker;
-            Payload pyl = Payload();
+            Payload payload = Payload();
 
             unpacker.feed(cr->getData(), cr->getLength());
-            unpacker.deserialize(pyl);
+            unpacker.deserialize(payload);
 
-            Serial.printf("The value is: %s\n", pyl.GetPayload().c_str());
+            Serial.printf("The value is: %s\n", payload.GetPayload().c_str());
         }
     };
     BLECharacteristic *pRXCharacteristic = nullptr;
 
     BLEService *pCommunicationService = nullptr;
     // Node *node = nullptr;
+
+    void StopBLEDeviceScan();
+    void StartBLEDeviceScan();
 
 public:
     enum ServiceDenomination
@@ -349,5 +358,6 @@ public:
     BLEUUID GetCommunicationCharacteristicTxUUID();
     BLEUUID GetCommunicationCharacteristicRxUUID();
 
-    void connectToDevice();
+    void echoMessage();
+    bool connectToDevice();
 };

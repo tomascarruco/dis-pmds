@@ -5,12 +5,12 @@
 
 class MyClientCallback : public BLEClientCallbacks
 {
-    void onConnect(BLEClient *pclient)
+    void onConnect(BLEClient *pClient)
     {
         Serial.println("onConnect");
     }
 
-    void onDisconnect(BLEClient *pclient)
+    void onDisconnect(BLEClient *pClient)
     {
 
         Serial.println("onDisconnect");
@@ -251,6 +251,16 @@ NetworkNode::NetworkNode()
     this->packetQueue = new PacketQueue();
 }
 
+void BLENetworkNode::StopBLEDeviceScan()
+{
+    this->pBleScanner->stop();
+}
+
+void BLENetworkNode::StartBLEDeviceScan()
+{
+    this->ScanForBLEDevices();
+}
+
 BLENetworkNode::BLENetworkNode(BLEServer *s /* , Node *n */)
 {
     // BLE client and server registration / scanner referencing
@@ -310,12 +320,6 @@ void BLENetworkNode::StartCommunicationService()
     this->pCommunicationService->start();
 }
 
-void BLENetworkNode::ScanForBLEDevices()
-{
-    if (this->doScan)
-        this->pBleScanner->start(10, false);
-}
-
 void BLENetworkNode::SetAdvertisedDeviceCallbacks(BLEAdvertisedDeviceCallbacks *pCallbacks)
 {
     this->pAdvertisedDeviceCallbacks = pCallbacks;
@@ -337,6 +341,12 @@ BLEUUID BLENetworkNode::GetCommunicationCharacteristicRxUUID()
 {
     BLEUUID uuid = BLEUUID::fromString(this->rx_CharacteristicUUID);
     return uuid;
+}
+
+void BLENetworkNode::ScanForBLEDevices()
+{
+    if (this->doScan)
+        this->pBleScanner->start(10, false);
 }
 
 void BLENetworkNode::onResult(BLEAdvertisedDevice device)
@@ -362,7 +372,15 @@ void BLENetworkNode::onResult(BLEAdvertisedDevice device)
     }
 
     Serial.printf("Device found.... %s\n", device_name.c_str());
-    // this->pBleScanner->stop();
+    this->pBleScanner->stop();
+
+    this->pServerReference->addPeerDevice(&device, false, peerDeviceCount++);
+    std::map<uint16_t, conn_status_t> peers = this->pServerReference->getPeerDevices(false);
+
+    /*
+    for (auto elem : peers)
+        Serial.printf("Conn ID: %d\n", elem.first);
+    */
 
     int service_count = device.getServiceUUIDCount();
     Serial.printf("Device has %d services\n", service_count);
@@ -377,6 +395,8 @@ void BLENetworkNode::onResult(BLEAdvertisedDevice device)
         this->device = new BLEAdvertisedDevice(device);
         this->doConnect = true;
         this->doScan = false;
+
+        Serial.println("Device is advertising the correct services");
         return;
     }
 
@@ -385,42 +405,40 @@ void BLENetworkNode::onResult(BLEAdvertisedDevice device)
     this->connected = false;
 }
 
-void BLENetworkNode::connectToDevice()
+bool BLENetworkNode::connectToDevice()
 {
     if (!this->doConnect)
-        return;
+        return false;
 
     this->pClient->setClientCallbacks(new MyClientCallback());
 
     int service_count = device->getServiceUUIDCount();
-    Serial.printf("Device has %d services\n", service_count);
-    for (int i = 0; i < service_count; ++i)
-    {
-        Serial.printf("Service: %s \n", device->getServiceUUID(i).toString().c_str());
-        Serial.printf("\\___:ADV Service?: %s \n", device->isAdvertisingService(device->getServiceUUID(i)) ? "t" : "f");
-    }
-
-    this->pClient->setClientCallbacks(new MyClientCallback());
 
     // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
-    bool res = this->pClient->connect(device);
+    bool connected = this->pClient->connect(device);
     Serial.println(" - Connected to server");
 
-    if (!res)
+    if (!connected)
     {
         Serial.println("Failed to connect to advertised device!");
         this->connected = false;
         this->doConnect = false;
         this->doScan = true;
-
-        return;
+        return false;
     }
+
     Serial.println("Connected to advertised device!");
 
     this->connected = true;
     this->doConnect = true;
     this->doScan = false;
 
+    return true;
+    // TODO: transform the BLEAddress into a NODE
+}
+
+void BLENetworkNode::echoMessage()
+{
     MsgPack::Packer packer;
     Payload payload = Payload("Some text");
     packer.pack(payload);
@@ -451,14 +469,16 @@ void BLENetworkNode::connectToDevice()
     }
 
     Serial.println("Got the service!");
+    if (packer.data() == nullptr)
+    {
+        Serial.println("Deref on nullptr in packer.data() on connectToDevice()");
+        return;
+    }
+    // ! Probably Dangerous code, deref of a static pointer
     uint8_t *data = (uint8_t *)packer.data();
     pRemoteCharacteristic->writeValue(data, packer.size(), false);
 
-    Serial.println("Wrote to characteristic");
-
-    this->connected = false;
+    this->connected = true;
     this->doConnect = false;
     this->doScan = false;
-
-    // TODO: transform the BLEAddress into a NODE
 }
